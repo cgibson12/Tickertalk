@@ -669,6 +669,8 @@ label.field-label{
 .sent-pick.sel-bull{ background:var(--bull-soft); color:var(--bull); border-color:var(--bull); }
 .sent-pick.sel-bear{ background:var(--bear-soft); color:var(--bear); border-color:var(--bear); }
 .sent-pick.sel-neutral{ background:var(--surface-2); color:var(--text); border-color:var(--text-dim); }
+#tfPicker .sent-pick{ background:var(--surface-2); color:var(--text-dim); border-color:var(--border); }
+#tfPicker .sent-pick.sel{ background:var(--gold-soft); color:var(--gold); border-color:var(--gold); }
 .composer-text{
   width:100%;
   min-height:90px;
@@ -937,6 +939,7 @@ async function loadRealPosts(){
       id: row.id,
       sym: row.sym,
       sent: row.sentiment,
+      timeframe: row.timeframe || 'swing',
       text: row.body,
       time: new Date(row.created_at).getTime(),
       profile: { handle: (row.profiles && row.profiles.handle) || "@someone", verified:false, agreeRate:null, followers:null },
@@ -998,6 +1001,7 @@ renderGainers();
 /* ================= Helpers ================= */
 function sentLabel(s){ return s==="bull" ? "Bullish" : s==="bear" ? "Bearish" : "Neutral"; }
 function sentClass(s){ return s==="bull" ? "sent-bull" : s==="bear" ? "sent-bear" : "sent-neutral"; }
+function tfLabel(tf){ return tf==="day" ? "Day trade" : tf==="long" ? "Long term" : "Swing"; }
 
 function sparkline(hist, w, h, colorVar){
   const min = Math.min(...hist), max = Math.max(...hist);
@@ -1068,6 +1072,7 @@ function postCardHTML(p){
     <button class="post-ticker" data-sym="${p.sym}">
       <span class="ticker-sym">${p.sym}</span>
       <span class="sent-badge ${sentClass(p.sent)}">${sentLabel(p.sent)}</span>
+      <span class="sent-badge sent-neutral">${tfLabel(p.timeframe || 'swing')}</span>
     </button>
     <div class="post-body">${p.text}</div>
     <div class="post-foot">
@@ -1504,10 +1509,12 @@ if(sb) refreshSession();
 /* ================= Composer sheet ================= */
 let composerSent = "bull";
 let composerSym = TICKERS[0].sym;
+let composerTimeframe = "swing";
 
 function buildComposer(prefillSym){
   composerSym = prefillSym || TICKERS[0].sym;
   composerSent = "bull";
+  composerTimeframe = "swing";
   const overlay = document.createElement("div");
   overlay.className = "sheet-overlay";
   overlay.id = "composerOverlay";
@@ -1528,6 +1535,12 @@ function buildComposer(prefillSym){
         <button class="sent-pick" data-sent="bear">Bearish</button>
         <button class="sent-pick" data-sent="neutral">Neutral</button>
       </div>
+      <label class="field-label">Timeframe</label>
+      <div class="sent-picker" id="tfPicker">
+        <button class="sent-pick" data-tf="day">Day trade</button>
+        <button class="sent-pick sel" data-tf="swing">Swing</button>
+        <button class="sent-pick" data-tf="long">Long term</button>
+      </div>
       <label class="field-label">Post</label>
       <textarea class="composer-text" id="composerText" maxlength="240" placeholder="What's your thesis? Keep it sharp."></textarea>
       <div class="charcount"><span id="charN">0</span>/240</div>
@@ -1546,11 +1559,19 @@ function buildComposer(prefillSym){
     });
   });
 
-  overlay.querySelectorAll(".sent-pick").forEach(btn=>{
+  overlay.querySelectorAll(".sent-picker:not(#tfPicker) .sent-pick").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      overlay.querySelectorAll(".sent-pick").forEach(b=>b.className="sent-pick");
+      overlay.querySelectorAll(".sent-picker:not(#tfPicker) .sent-pick").forEach(b=>b.className="sent-pick");
       composerSent = btn.dataset.sent;
       btn.classList.add("sent-pick","sel-"+composerSent);
+    });
+  });
+
+  overlay.querySelectorAll("#tfPicker .sent-pick").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      overlay.querySelectorAll("#tfPicker .sent-pick").forEach(b=>b.classList.remove("sel"));
+      btn.classList.add("sel");
+      composerTimeframe = btn.dataset.tf;
     });
   });
 
@@ -1576,6 +1597,7 @@ function buildComposer(prefillSym){
       id: "u_"+Date.now(),
       sym: composerSym,
       sent: composerSent,
+      timeframe: composerTimeframe,
       text: text,
       time: Date.now(),
       profile: { handle: currentUser.handle, verified: false, agreeRate: null, followers: null },
@@ -1586,7 +1608,7 @@ function buildComposer(prefillSym){
     };
     if(sb){
       const { data, error } = await sb.from("posts").insert({
-        user_id: currentUser.id, sym: composerSym, sentiment: composerSent, body: text
+        user_id: currentUser.id, sym: composerSym, sentiment: composerSent, body: text, timeframe: composerTimeframe
       }).select().single();
       if(!error && data){
         newPost.id = data.id;
