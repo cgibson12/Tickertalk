@@ -1824,14 +1824,14 @@ function openDetail(sym){
         <div class="gauge-bear" style="width:${bearPct}%"></div>
       </div>
       <button class="watch-btn ${watched?'on':''}" id="detailWatchBtn" style="width:100%;justify-content:center;margin-bottom:16px;padding:9px 0;">${starIcon}${watched?'Watching this ticker':'Add to watchlist'}</button>
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:0;">
-        <label class="field-label" style="margin:0;">Takes</label>
-        <div class="chiprow" id="detailSortChips" style="padding:0;">
+      <div>
+        <label class="field-label" style="margin:0 0 8px;">Takes</label>
+        <div class="chiprow" id="detailSortChips" style="padding:0; justify-content:center;">
           <button class="chip ${detailSort==='latest'?'active':''}" data-sort="latest">Latest</button>
           <button class="chip ${detailSort==='top'?'active':''}" data-sort="top">Top</button>
         </div>
       </div>
-      <div id="detailPosts" style="margin-top:10px;">${related.length ? related.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet on '+sym+'.</div>'}</div>
+      <div id="detailPosts" style="margin-top:14px;">${related.length ? related.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet on '+sym+'.</div>'}</div>
     </div>`;
   document.body.appendChild(overlay);
 
