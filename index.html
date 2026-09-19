@@ -1420,11 +1420,38 @@ function buildAuthSheet(){
   });
 }
 
-document.getElementById("authBtn").addEventListener("click", async ()=>{
-  if(currentUser){
+function buildAccountSheet(){
+  const overlay = document.createElement("div");
+  overlay.className = "sheet-overlay";
+  overlay.id = "accountOverlay";
+  overlay.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">${currentUser.handle}</div>
+        <button class="sheet-close" id="closeAccount">&times;</button>
+      </div>
+      <button class="post-submit" id="viewMyPosts" style="margin-bottom:10px;">View my posts</button>
+      <button class="follow-btn" id="doLogout" style="width:100%; justify-content:center; padding:9px 0; color:var(--bear); border-color:var(--bear);">Log out</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
+  document.getElementById("closeAccount").addEventListener("click", ()=> overlay.remove());
+  document.getElementById("viewMyPosts").addEventListener("click", ()=>{
+    setAuthorFilter(currentUser.handle);
+    overlay.remove();
+  });
+  document.getElementById("doLogout").addEventListener("click", async ()=>{
     if(sb) await sb.auth.signOut();
     currentUser = null;
     updateAuthUI();
+    overlay.remove();
+  });
+}
+
+document.getElementById("authBtn").addEventListener("click", async ()=>{
+  if(currentUser){
+    buildAccountSheet();
     return;
   }
   buildAuthSheet();
