@@ -1055,7 +1055,6 @@ function postCardHTML(p){
   const isSelf = prof.handle === "@you";
   const followingThem = userState.following.includes(prof.handle);
   const subBits = [];
-  if(prof.agreeRate!=null) subBits.push(`${prof.agreeRate}% agree`);
   if(prof.followers!=null) subBits.push(`${fmtCount(prof.followers)} followers`);
   subBits.push(relTime(Math.round((Date.now()-p.time)/60000)));
   return `
@@ -1110,7 +1109,7 @@ function renderFeed(){
                 ${avatarHTML(p.handle, true)}
                 <div class="post-top-meta">
                   <span class="handle">${p.verified ? verifiedIcon : ""}${p.handle}</span>
-                  <span class="meta-sub">${fmtCount(p.followers)} followers &middot; ${p.agreeRate}% agree</span>
+                  <span class="meta-sub">${fmtCount(p.followers)} followers</span>
                 </div>
               </div>
               <button class="follow-btn" data-handle="${p.handle}">Follow</button>
