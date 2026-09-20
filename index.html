@@ -204,6 +204,13 @@ a{ color:inherit; }
   font-weight:600;
 }
 .gainer-chg.down{ color:var(--bear); }
+.sector-card{ min-width:118px; }
+.sector-tickers{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:0.6rem;
+  color:var(--text-faint);
+  margin-top:1px;
+}
 .gainers-toggle{
   display:flex;
   gap:6px;
@@ -854,6 +861,77 @@ label.field-label{
 }
 .profile-stats .dstat{ cursor:default; }
 
+/* ---------- Avatar picker ---------- */
+.avatar-pick-preview{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:10px;
+}
+.avatar-pick-preview button{
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+}
+.avatar-pick-preview .avatar-lg{ width:56px; height:56px; font-size:1.05rem; }
+.avatar-pick-label{
+  font-size:0.82rem;
+  color:var(--text-dim);
+  font-weight:600;
+}
+.avatar-pick-sub{
+  font-size:0.72rem;
+  color:var(--text-faint);
+}
+.avatar-picker-panel{
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:14px;
+  background:var(--surface-2);
+}
+.avatar-upload-btn{
+  width:100%;
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--text);
+  border-radius:10px;
+  padding:10px 0;
+  font-size:0.85rem;
+  font-weight:600;
+  cursor:pointer;
+  margin-bottom:10px;
+}
+.avatar-icon-search{
+  width:100%;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text);
+  border-radius:10px;
+  padding:8px 11px;
+  font-size:0.85rem;
+  margin-bottom:10px;
+  font-family:inherit;
+}
+.avatar-icon-grid{
+  display:grid;
+  grid-template-columns:repeat(6, 1fr);
+  gap:8px;
+}
+.avatar-icon-btn{
+  aspect-ratio:1;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-size:1.2rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.avatar-icon-btn:active{ background:var(--gold-soft); border-color:var(--gold); }
+
 /* scrollbar tidy */
 ::-webkit-scrollbar{ width:0; height:0; }
 </style>
@@ -877,6 +955,8 @@ label.field-label{
     <div class="gainers-wrap">
       <div class="gainers-toggle" id="gainersToggle">
         <button class="active" data-mode="gainers">Top gainers today</button>
+        <span class="sep">&middot;</span>
+        <button data-mode="sectors">Top sectors</button>
         <span class="sep">&middot;</span>
         <button data-mode="watchlist">My watchlist</button>
       </div>
@@ -933,18 +1013,18 @@ label.field-label{
 
 /* ================= Mock market data ================= */
 const TICKERS = [
-  {sym:"AAPL", name:"Apple", price:228.41, chg:1.12, hist:[221,223,222,226,225,229,228]},
-  {sym:"TSLA", name:"Tesla", price:256.90, chg:-2.38, hist:[271,268,264,260,258,252,257]},
-  {sym:"NVDA", name:"Nvidia", price:184.20, chg:3.05, hist:[168,172,174,178,180,183,184]},
-  {sym:"SPY",  name:"S&P 500 ETF", price:588.10, chg:0.44, hist:[579,581,583,584,586,587,588]},
-  {sym:"AMD",  name:"AMD", price:161.75, chg:-1.02, hist:[168,166,164,163,161,160,162]},
-  {sym:"PLTR", name:"Palantir", price:41.63, chg:5.61, hist:[35,36,37,38,39,40,42]},
-  {sym:"COIN", name:"Coinbase", price:298.20, chg:-3.87, hist:[320,314,309,305,300,296,298]},
-  {sym:"MSFT", name:"Microsoft", price:430.55, chg:0.61, hist:[424,425,427,428,429,431,431]},
-  {sym:"AMZN", name:"Amazon", price:198.30, chg:1.87, hist:[189,191,192,194,195,197,198]},
-  {sym:"META", name:"Meta", price:589.75, chg:-0.58, hist:[598,595,592,590,588,591,590]},
-  {sym:"GME",  name:"GameStop", price:24.15, chg:8.92, hist:[19,20,21,21,22,23,24]},
-  {sym:"SOFI", name:"SoFi", price:14.82, chg:2.21, hist:[13,13,14,14,14,15,15]},
+  {sym:"AAPL", name:"Apple", price:228.41, chg:1.12, hist:[221,223,222,226,225,229,228], sector:"Technology"},
+  {sym:"TSLA", name:"Tesla", price:256.90, chg:-2.38, hist:[271,268,264,260,258,252,257], sector:"Consumer"},
+  {sym:"NVDA", name:"Nvidia", price:184.20, chg:3.05, hist:[168,172,174,178,180,183,184], sector:"Technology"},
+  {sym:"SPY",  name:"S&P 500 ETF", price:588.10, chg:0.44, hist:[579,581,583,584,586,587,588], sector:null},
+  {sym:"AMD",  name:"AMD", price:161.75, chg:-1.02, hist:[168,166,164,163,161,160,162], sector:"Technology"},
+  {sym:"PLTR", name:"Palantir", price:41.63, chg:5.61, hist:[35,36,37,38,39,40,42], sector:"Technology"},
+  {sym:"COIN", name:"Coinbase", price:298.20, chg:-3.87, hist:[320,314,309,305,300,296,298], sector:"Financial"},
+  {sym:"MSFT", name:"Microsoft", price:430.55, chg:0.61, hist:[424,425,427,428,429,431,431], sector:"Technology"},
+  {sym:"AMZN", name:"Amazon", price:198.30, chg:1.87, hist:[189,191,192,194,195,197,198], sector:"Consumer"},
+  {sym:"META", name:"Meta", price:589.75, chg:-0.58, hist:[598,595,592,590,588,591,590], sector:"Technology"},
+  {sym:"GME",  name:"GameStop", price:24.15, chg:8.92, hist:[19,20,21,21,22,23,24], sector:"Consumer"},
+  {sym:"SOFI", name:"SoFi", price:14.82, chg:2.21, hist:[13,13,14,14,14,15,15], sector:"Financial"},
 ];
 
 const PROFILES = [
@@ -1036,7 +1116,7 @@ async function loadRealPosts(){
   try{
     const { data, error } = await sb
       .from("posts_with_counts")
-      .select("*, profiles(handle)")
+      .select("*, profiles(handle, avatar_url)")
       .order("created_at", { ascending: false })
       .limit(60);
     if(error || !data) return;
@@ -1047,7 +1127,7 @@ async function loadRealPosts(){
       timeframe: row.timeframe || 'swing',
       text: row.body,
       time: new Date(row.created_at).getTime(),
-      profile: { handle: (row.profiles && row.profiles.handle) || "@someone", verified:false, agreeRate:null, followers:null },
+      profile: { handle: (row.profiles && row.profiles.handle) || "@someone", verified:false, agreeRate:null, followers:null, avatar: (row.profiles && row.profiles.avatar_url) || null },
       agrees: row.agree_count || 0,
       replies: row.reply_count || 0,
       likes: 0,
@@ -1089,8 +1169,35 @@ renderTape();
 
 /* ================= Top gainers / watchlist strip ================= */
 let gainersMode = "gainers";
+function computeSectors(){
+  const bySector = {};
+  TICKERS.forEach(t=>{
+    if(!t.sector) return;
+    if(!bySector[t.sector]) bySector[t.sector] = [];
+    bySector[t.sector].push(t);
+  });
+  return Object.keys(bySector).map(name=>{
+    const list = bySector[name];
+    const avg = list.reduce((s,t)=>s+t.chg,0) / list.length;
+    return { name, avg, tickers: list };
+  }).sort((a,b)=>b.avg-a.avg);
+}
 function renderGainers(){
   const row = document.getElementById("gainersRow");
+  if(gainersMode === "sectors"){
+    const sectors = computeSectors();
+    row.innerHTML = sectors.map(s=>{
+      const up = s.avg >= 0;
+      const syms = s.tickers.map(t=>t.sym).join(" ");
+      return `
+      <button class="gainer-card sector-card ${up?'':'down'}" data-sector="${s.name}">
+        <span class="gainer-sym">${s.name}</span>
+        <span class="gainer-chg ${up?'':'down'}">${up?'▲':'▼'} ${Math.abs(s.avg).toFixed(2)}%</span>
+        <span class="sector-tickers">${syms}</span>
+      </button>`;
+    }).join("");
+    return;
+  }
   let list;
   if(gainersMode === "watchlist"){
     list = TICKERS.filter(t=>userState.watch.includes(t.sym));
@@ -1112,7 +1219,14 @@ function renderGainers(){
 }
 document.getElementById("gainersRow").addEventListener("click",(e)=>{
   const card = e.target.closest(".gainer-card");
-  if(card) openDetail(card.dataset.sym);
+  if(!card) return;
+  if(card.dataset.sector){
+    const sectors = computeSectors();
+    const sec = sectors.find(s=>s.name===card.dataset.sector);
+    if(sec && sec.tickers[0]) openDetail(sec.tickers[0].sym);
+    return;
+  }
+  if(card.dataset.sym) openDetail(card.dataset.sym);
 });
 document.getElementById("gainersToggle").addEventListener("click",(e)=>{
   const btn = e.target.closest("button[data-mode]");
@@ -1160,10 +1274,36 @@ function hashStr(s){
   for(let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) | 0; }
   return Math.abs(h);
 }
-function avatarHTML(handle, large){
+const AVATAR_ICONS = [
+  {key:"bull", emoji:"🐂", label:"bull"},
+  {key:"bear", emoji:"🐻", label:"bear"},
+  {key:"rocket", emoji:"🚀", label:"rocket moon"},
+  {key:"chart-up", emoji:"📈", label:"chart up trend"},
+  {key:"chart-down", emoji:"📉", label:"chart down trend"},
+  {key:"diamond", emoji:"💎", label:"diamond hands"},
+  {key:"owl", emoji:"🦉", label:"owl wise"},
+  {key:"fire", emoji:"🔥", label:"fire hot"},
+  {key:"lightning", emoji:"⚡", label:"lightning fast"},
+  {key:"target", emoji:"🎯", label:"target bullseye"},
+  {key:"moon", emoji:"🌙", label:"moon"},
+  {key:"whale", emoji:"🐳", label:"whale big money"},
+  {key:"shark", emoji:"🦈", label:"shark"},
+  {key:"turtle", emoji:"🐢", label:"turtle slow long term"},
+  {key:"robot", emoji:"🤖", label:"robot algo bot"},
+  {key:"crystal", emoji:"🔮", label:"crystal ball prediction"},
+];
+function avatarHTML(handle, large, avatarValue){
+  const sizeClass = `avatar${large?' avatar-lg':''}`;
+  if(avatarValue && avatarValue.startsWith("icon:")){
+    const emoji = avatarValue.slice(5);
+    return `<span class="${sizeClass}" style="background:var(--surface-2); font-size:${large?'1.3rem':'0.85rem'};">${emoji}</span>`;
+  }
+  if(avatarValue && avatarValue.startsWith("data:")){
+    return `<span class="${sizeClass}" style="padding:0; overflow:hidden;"><img src="${avatarValue}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;"></span>`;
+  }
   const initials = handle.replace("@","").slice(0,2).toUpperCase();
   const color = AVATAR_PALETTE[hashStr(handle) % AVATAR_PALETTE.length];
-  return `<span class="avatar${large?' avatar-lg':''}" style="background:${color}">${initials}</span>`;
+  return `<span class="${sizeClass}" style="background:${color}">${initials}</span>`;
 }
 const starIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3 6 6.5 1-4.7 4.5L18 20l-6-3.4L6 20l1.2-6.5L2.5 9 9 8z"/></svg>`;
 const verifiedIcon = `<svg class="verified-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 2.1 3.1-.6 1 3 2.9 1.4-.6 3.2 1.9 2.5-1.9 2.5.6 3.2-2.9 1.4-1 3-3.1-.6L12 22l-2.4-2.1-3.1.6-1-3-2.9-1.4.6-3.2L1.3 10l1.9-2.5-.6-3.2 2.9-1.4 1-3 3.1.6z"/><path d="M9 12.2l2 2 4-4.2" stroke="var(--surface)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1185,7 +1325,7 @@ function postCardHTML(p){
   <article class="post" data-id="${p.id}">
     <div class="post-top">
       <button class="post-author-link" data-handle="${prof.handle}">
-        ${avatarHTML(prof.handle, true)}
+        ${avatarHTML(prof.handle, true, prof.avatar)}
         <div class="post-top-meta">
           <span class="handle">${prof.verified ? verifiedIcon : ""}${prof.handle}</span>
           <span class="meta-sub">${subBits.join(" &middot; ")}</span>
@@ -1208,10 +1348,11 @@ function postCardHTML(p){
 
 function composeBarHTML(){
   const handle = currentUser ? currentUser.handle : "@you";
+  const avatar = currentUser ? currentUser.avatar : null;
   return `
   <button class="compose-bar" id="composeBar">
-    ${avatarHTML(handle, false)}
-    <span>Share your thesis...</span>
+    ${avatarHTML(handle, false, avatar)}
+    <span>Share your take...</span>
   </button>`;
 }
 
@@ -1291,6 +1432,30 @@ async function openProfile(handle){
   const followingThem = userState.following.includes(handle);
   const accentColor = AVATAR_PALETTE[hashStr(handle) % AVATAR_PALETTE.length];
 
+  // resolve avatar + bio + joined date before first paint so the header is correct immediately
+  let headAvatar = null, headBio = null, headJoined = null;
+  if(isSelf && currentUser){
+    headAvatar = currentUser.avatar;
+  }else if(sb && !mock){
+    try{
+      const { data } = await sb.from("profiles").select("bio, created_at, avatar_url").eq("handle", handle).maybeSingle();
+      if(data){
+        headAvatar = data.avatar_url || null;
+        headBio = data.bio || null;
+        headJoined = data.created_at ? new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : null;
+      }
+    }catch(e){ /* leave defaults */ }
+  }
+  if(isSelf && sb){
+    try{
+      const { data } = await sb.from("profiles").select("bio, created_at").eq("id", currentUser.id).maybeSingle();
+      if(data){
+        headBio = data.bio || null;
+        headJoined = data.created_at ? new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : null;
+      }
+    }catch(e){ /* leave defaults */ }
+  }
+
   const overlay = document.createElement("div");
   overlay.className = "sheet-overlay";
   overlay.id = "profileOverlay";
@@ -1303,7 +1468,7 @@ async function openProfile(handle){
         <button class="sheet-close" id="closeProfile">&times;</button>
       </div>
       <div class="profile-head">
-        ${avatarHTML(handle, true).replace('avatar-lg', 'avatar-lg profile-avatar')}
+        ${avatarHTML(handle, true, headAvatar).replace('avatar-lg', 'avatar-lg profile-avatar')}
         <div style="flex:1; min-width:0; padding-top:6px;">
           <div class="profile-name-row">
             <span class="profile-handle">${handle}</span>
@@ -1315,8 +1480,8 @@ async function openProfile(handle){
           </div>
         </div>
       </div>
-      <div class="profile-joined" id="profileJoined"></div>
-      <div class="profile-bio empty-bio" id="profileBio">No bio yet.</div>
+      <div class="profile-joined">${headJoined ? `Trading since ${headJoined}` : ''}</div>
+      <div class="profile-bio ${headBio ? '' : 'empty-bio'}">${headBio || 'No bio yet.'}</div>
       ${isSelf ? '' : `<button class="follow-btn ${followingThem?'on':''}" id="profileFollowBtn" style="width:100%; justify-content:center; padding:9px 0; margin-bottom:14px;">${followingThem?'Following':'Follow'}</button>`}
       <label class="field-label" style="margin-top:0;">Posts</label>
       <div id="profilePosts">${authoredPosts.length ? authoredPosts.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet.</div>'}</div>
@@ -1334,23 +1499,6 @@ async function openProfile(handle){
       openProfile(handle);
       renderFeed();
     });
-  }
-
-  // load real bio + joined date if this is a real (non-mock) account
-  if(sb && !mock){
-    try{
-      const { data } = await sb.from("profiles").select("bio, created_at").eq("handle", handle).maybeSingle();
-      const bioEl = document.getElementById("profileBio");
-      if(data && data.bio){
-        bioEl.textContent = data.bio;
-        bioEl.classList.remove("empty-bio");
-      }
-      if(data && data.created_at){
-        const d = new Date(data.created_at);
-        const joined = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-        document.getElementById("profileJoined").textContent = `Trading since ${joined}`;
-      }
-    }catch(e){ /* leave defaults */ }
   }
 
   document.getElementById("profilePosts").addEventListener("click",(e)=>{
@@ -1529,15 +1677,15 @@ function updateAuthUI(){
 }
 
 async function loadProfile(userId){
-  const { data } = await sb.from("profiles").select("handle").eq("id", userId).maybeSingle();
-  return data ? data.handle : null;
+  const { data } = await sb.from("profiles").select("handle, avatar_url").eq("id", userId).maybeSingle();
+  return data ? { handle: data.handle, avatar: data.avatar_url || null } : null;
 }
 
 async function ensureProfile(userId, emailOrHandle){
   let handle = emailOrHandle.startsWith("@") ? emailOrHandle : "@"+emailOrHandle.split("@")[0].replace(/[^a-zA-Z0-9_]/g,"").slice(0,20);
   if(handle === "@") handle = "@trader"+Math.floor(Math.random()*10000);
   try{ await sb.from("profiles").insert({ id: userId, handle: handle }); }catch(e){ /* row may already exist */ }
-  return handle;
+  return { handle: handle, avatar: null };
 }
 
 async function syncWatchlistFromServer(){
@@ -1559,9 +1707,9 @@ async function refreshSession(){
   const { data } = await sb.auth.getSession();
   const session = data && data.session;
   if(session){
-    let handle = await loadProfile(session.user.id);
-    if(!handle) handle = await ensureProfile(session.user.id, session.user.email || "trader");
-    currentUser = { id: session.user.id, handle: handle };
+    let prof = await loadProfile(session.user.id);
+    if(!prof) prof = await ensureProfile(session.user.id, session.user.email || "trader");
+    currentUser = { id: session.user.id, handle: prof.handle, avatar: prof.avatar };
     syncWatchlistFromServer();
     renderFeed();
   }
@@ -1641,7 +1789,7 @@ function buildAuthSheet(){
         if(data.user){
           await sb.from("profiles").insert({ id: data.user.id, handle: cleanHandle });
           if(data.session){
-            currentUser = { id: data.user.id, handle: cleanHandle };
+            currentUser = { id: data.user.id, handle: cleanHandle, avatar: null };
             updateAuthUI();
             syncWatchlistFromServer();
             overlay.remove();
@@ -1656,16 +1804,17 @@ function buildAuthSheet(){
       }else{
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if(error) throw error;
-        let h = await loadProfile(data.user.id);
-        if(!h){
+        let prof = await loadProfile(data.user.id);
+        if(!prof){
           let pending = null;
           try{ pending = localStorage.getItem("tickertalk_pending_handle_"+email); }catch(e){}
-          h = await ensureProfile(data.user.id, pending || data.user.email || email);
+          prof = await ensureProfile(data.user.id, pending || data.user.email || email);
           try{ localStorage.removeItem("tickertalk_pending_handle_"+email); }catch(e){}
         }
-        currentUser = { id: data.user.id, handle: h };
+        currentUser = { id: data.user.id, handle: prof.handle, avatar: prof.avatar };
         updateAuthUI();
         syncWatchlistFromServer();
+        renderFeed();
         overlay.remove();
       }
     }catch(err){
@@ -1689,6 +1838,19 @@ async function buildAccountSheet(){
         <div class="sheet-title">${currentUser.handle}</div>
         <button class="sheet-close" id="closeAccount">&times;</button>
       </div>
+      <div class="avatar-pick-preview">
+        <button id="avatarPreviewBtn">${avatarHTML(currentUser.handle, true, currentUser.avatar)}</button>
+        <div>
+          <div class="avatar-pick-label">Avatar</div>
+          <div class="avatar-pick-sub">Tap to change</div>
+        </div>
+      </div>
+      <div class="avatar-picker-panel hidden" id="avatarPanel">
+        <input type="file" accept="image/*" id="avatarFileInput" style="display:none;">
+        <button class="avatar-upload-btn" id="avatarUploadBtn">Upload a photo</button>
+        <input type="text" class="avatar-icon-search" id="avatarIconSearch" placeholder="Search icons — bull, rocket, moon...">
+        <div class="avatar-icon-grid" id="avatarIconGrid"></div>
+      </div>
       <div class="detail-stats" id="accountStats">
         <div class="dstat"><div class="n">&mdash;</div><div class="l">posts</div></div>
       </div>
@@ -1711,6 +1873,64 @@ async function buildAccountSheet(){
     currentUser = null;
     updateAuthUI();
     overlay.remove();
+  });
+
+  /* ---- avatar picker ---- */
+  const avatarPanel = document.getElementById("avatarPanel");
+  document.getElementById("avatarPreviewBtn").addEventListener("click", ()=>{
+    avatarPanel.classList.toggle("hidden");
+  });
+
+  function renderIconGrid(filterText){
+    const grid = document.getElementById("avatarIconGrid");
+    const q = (filterText || "").trim().toLowerCase();
+    const list = q ? AVATAR_ICONS.filter(i => i.label.includes(q)) : AVATAR_ICONS;
+    grid.innerHTML = list.map(i => `<button class="avatar-icon-btn" data-emoji="${i.emoji}" title="${i.key}">${i.emoji}</button>`).join("") ||
+      `<div style="grid-column:1/-1; font-size:0.78rem; color:var(--text-faint); padding:8px 0;">No icons match.</div>`;
+  }
+  renderIconGrid("");
+  document.getElementById("avatarIconSearch").addEventListener("input", (e)=> renderIconGrid(e.target.value));
+
+  async function applyAvatar(value){
+    if(!sb || !currentUser) return;
+    try{
+      await sb.from("profiles").update({ avatar_url: value }).eq("id", currentUser.id);
+      currentUser.avatar = value;
+      // keep this session's already-loaded posts in sync so cards update without a reload
+      posts.forEach(p=>{ if(p.profile && p.profile.handle === currentUser.handle) p.profile.avatar = value; });
+      document.getElementById("avatarPreviewBtn").innerHTML = avatarHTML(currentUser.handle, true, value);
+      avatarPanel.classList.add("hidden");
+      renderFeed();
+    }catch(e){ /* best-effort */ }
+  }
+
+  document.getElementById("avatarIconGrid").addEventListener("click",(e)=>{
+    const btn = e.target.closest(".avatar-icon-btn");
+    if(btn) applyAvatar("icon:" + btn.dataset.emoji);
+  });
+
+  document.getElementById("avatarUploadBtn").addEventListener("click", ()=>{
+    document.getElementById("avatarFileInput").click();
+  });
+  document.getElementById("avatarFileInput").addEventListener("change", (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      img.onload = ()=>{
+        const size = 200;
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        applyAvatar(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
   });
 
   const bioTextarea = document.getElementById("bioText");
@@ -1796,7 +2016,7 @@ function buildComposer(prefillSym){
         <button class="sent-pick" data-tf="long">Long term</button>
       </div>
       <label class="field-label">Post</label>
-      <textarea class="composer-text" id="composerText" maxlength="240" placeholder="What's your thesis? Keep it sharp."></textarea>
+      <textarea class="composer-text" id="composerText" maxlength="240" placeholder="Share your take. Keep it sharp."></textarea>
       <div class="charcount"><span id="charN">0</span>/240</div>
       <button class="post-submit" id="submitPost" disabled>Post to feed</button>
     </div>`;
@@ -1854,7 +2074,7 @@ function buildComposer(prefillSym){
       timeframe: composerTimeframe,
       text: text,
       time: Date.now(),
-      profile: { handle: currentUser.handle, verified: false, agreeRate: null, followers: null },
+      profile: { handle: currentUser.handle, verified: false, agreeRate: null, followers: null, avatar: currentUser.avatar },
       agrees: 0,
       replies: 0,
       likes: 0,
