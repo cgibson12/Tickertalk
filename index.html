@@ -1116,8 +1116,27 @@ let posts = SEED_POSTS.map((p,i)=>({
 const SUPABASE_URL = "https://anaogolzoedjovlbdkfe.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_QTh5rmcO9SDZBqADLwFV-w_2oVy0NCT";
 const MARKET_DATA_URL = SUPABASE_URL + "/functions/v1/Market-data";
+const SYMBOL_SEARCH_URL = SUPABASE_URL + "/functions/v1/Symbol-search";
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let currentUser = null; // { id, handle } once signed in
+
+async function fetchSnapshotForSymbol(sym){
+  try{
+    const res = await fetch(`${MARKET_DATA_URL}?symbols=${sym}&mode=snapshot`, {
+      headers: { Authorization: "Bearer " + SUPABASE_ANON_KEY }
+    });
+    if(res.ok){
+      const snap = await res.json();
+      const s = snap[sym];
+      const t = TICKERS.find(x=>x.sym===sym);
+      if(t && s && s.price != null){
+        t.price = s.price;
+        t.chg = s.chg;
+        t.hist = [t.price, t.price, t.price, t.price, t.price, t.price, t.price];
+      }
+    }
+  }catch(e){ /* market-data function not live yet — keep placeholder */ }
+}
 
 /* ================= Persistence (per-viewer, guarded) ================= */
 const LS_KEY = "tickertalk_state_v1";
@@ -2057,6 +2076,7 @@ function buildComposer(prefillSym){
         <button class="sheet-close" id="closeComposer">&times;</button>
       </div>
       <label class="field-label">Ticker</label>
+      <input type="text" class="composer-text" id="tickerSearchInput" style="min-height:auto; height:42px;" placeholder="Search any stock — symbol or name...">
       <div class="ticker-picker" id="tickerPicker">
         ${TICKERS.map(t=>`<button class="ticker-pick ${t.sym===composerSym?'sel':''}" data-sym="${t.sym}">${t.sym}</button>`).join("")}
       </div>
@@ -2082,12 +2102,65 @@ function buildComposer(prefillSym){
   overlay.addEventListener("click",(e)=>{ if(e.target === overlay) closeComposer(); });
   document.getElementById("closeComposer").addEventListener("click", closeComposer);
 
-  overlay.querySelectorAll(".ticker-pick").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      overlay.querySelectorAll(".ticker-pick").forEach(b=>b.classList.remove("sel"));
-      btn.classList.add("sel");
-      composerSym = btn.dataset.sym;
-    });
+  const tickerPickerEl = document.getElementById("tickerPicker");
+  const tickerSearchInput = document.getElementById("tickerSearchInput");
+  let tickerSearchDebounce = null;
+  let remoteResultNames = {}; // sym -> name, for results not yet in local TICKERS
+
+  function renderTickerButtons(list, remoteOnly){
+    return list.map(t=>{
+      const isRemote = remoteOnly && remoteOnly.has(t.sym);
+      return `<button class="ticker-pick ${t.sym===composerSym?'sel':''}" data-sym="${t.sym}" data-name="${(t.name||'').replace(/"/g,'&quot;')}" data-remote="${isRemote?'1':'0'}">${t.sym}</button>`;
+    }).join("");
+  }
+
+  async function runTickerSearch(query){
+    const q = query.trim().toUpperCase();
+    if(!q){
+      tickerPickerEl.innerHTML = renderTickerButtons(TICKERS);
+      return;
+    }
+    const localMatches = TICKERS.filter(t => t.sym.includes(q) || (t.name && t.name.toUpperCase().includes(q)));
+    let combined = localMatches.slice();
+    const remoteFlags = new Set();
+    if(sb){
+      try{
+        const res = await fetch(`${SYMBOL_SEARCH_URL}?q=${encodeURIComponent(q)}`, { headers: { Authorization: "Bearer " + SUPABASE_ANON_KEY } });
+        if(res.ok){
+          const remote = await res.json();
+          if(Array.isArray(remote)){
+            remote.forEach(r=>{
+              if(!combined.find(t=>t.sym===r.symbol)){
+                remoteResultNames[r.symbol] = r.name;
+                combined.push({ sym: r.symbol, name: r.name });
+                remoteFlags.add(r.symbol);
+              }
+            });
+          }
+        }
+      }catch(e){ /* offline or function not live — local matches only */ }
+    }
+    tickerPickerEl.innerHTML = combined.length ? renderTickerButtons(combined, remoteFlags) :
+      `<div class="empty" style="padding:10px 2px; text-align:left;">No matches.</div>`;
+  }
+
+  tickerSearchInput.addEventListener("input", (e)=>{
+    clearTimeout(tickerSearchDebounce);
+    const val = e.target.value;
+    tickerSearchDebounce = setTimeout(()=> runTickerSearch(val), 300);
+  });
+
+  tickerPickerEl.addEventListener("click", (e)=>{
+    const btn = e.target.closest(".ticker-pick");
+    if(!btn) return;
+    tickerPickerEl.querySelectorAll(".ticker-pick").forEach(b=>b.classList.remove("sel"));
+    btn.classList.add("sel");
+    composerSym = btn.dataset.sym;
+    if(btn.dataset.remote === "1" && !TICKERS.find(t=>t.sym===composerSym)){
+      const sym = composerSym;
+      TICKERS.push({ sym, name: btn.dataset.name || sym, price:0, chg:0, hist:[0,0,0,0,0,0,0], sector:null });
+      fetchSnapshotForSymbol(sym);
+    }
   });
 
   overlay.querySelectorAll(".sent-picker:not(#tfPicker) .sent-pick").forEach(btn=>{
