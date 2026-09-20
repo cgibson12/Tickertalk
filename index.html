@@ -945,6 +945,9 @@ label.field-label{
     <div class="brand-row">
       <div class="brand">Ticker<span>Talk</span></div>
       <div style="display:flex; align-items:center; gap:8px;">
+        <button class="theme-toggle" id="openStockSearchBtn" style="padding:5px 9px; display:flex; align-items:center;" aria-label="Search stocks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px; height:15px;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        </button>
         <button class="theme-toggle" id="authBtn">Log in</button>
         <button class="theme-toggle" id="themeToggle">Auto</button>
       </div>
@@ -2266,6 +2269,98 @@ function commentRowHTML(c){
     </div>
   </div>`;
 }
+
+/* ================= Global stock search ================= */
+function stockSearchResultHTML(t, isRemote){
+  const known = TICKERS.find(x=>x.sym===t.sym);
+  const priceBit = known ? `<span style="font-family:'IBM Plex Mono',monospace; color:var(--text-faint); font-size:0.74rem;">$${known.price.toFixed(2)}</span>` : "";
+  return `
+  <button class="suggest-row" data-sym="${t.sym}" data-name="${(t.name||'').replace(/"/g,'&quot;')}" data-remote="${isRemote?'1':'0'}" style="width:100%; text-align:left; border:none; cursor:pointer;">
+    <div class="suggest-info">
+      <span class="ticker-sym mono" style="min-width:52px; display:inline-block;">${t.sym}</span>
+      <span class="meta-sub" style="max-width:none; overflow:visible; white-space:normal;">${t.name || ''}</span>
+    </div>
+    ${priceBit}
+  </button>`;
+}
+
+function openStockSearch(){
+  const overlay = document.createElement("div");
+  overlay.className = "sheet-overlay";
+  overlay.id = "stockSearchOverlay";
+  overlay.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">Search stocks</div>
+        <button class="sheet-close" id="closeStockSearch">&times;</button>
+      </div>
+      <input type="text" class="composer-text" id="globalStockSearchInput" style="min-height:auto; height:44px;" placeholder="Search any stock — symbol or name...">
+      <div class="suggest-list" id="globalStockResults" style="margin-top:14px;"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
+  document.getElementById("closeStockSearch").addEventListener("click", ()=> overlay.remove());
+
+  const input = document.getElementById("globalStockSearchInput");
+  const resultsEl = document.getElementById("globalStockResults");
+  let debounceTimer = null;
+
+  function renderDefault(){
+    const top = TICKERS.filter(t=>t.sector).slice(0, 10);
+    resultsEl.innerHTML = top.map(t=>stockSearchResultHTML(t, false)).join("");
+  }
+  renderDefault();
+
+  async function runSearch(query){
+    const q = query.trim().toUpperCase();
+    if(!q){ renderDefault(); return; }
+    const localMatches = TICKERS.filter(t => t.sym.includes(q) || (t.name && t.name.toUpperCase().includes(q)));
+    let combined = localMatches.slice();
+    const remoteFlags = new Set();
+    if(sb){
+      try{
+        const res = await fetch(`${SYMBOL_SEARCH_URL}?q=${encodeURIComponent(q)}`, { headers: { Authorization: "Bearer " + SUPABASE_ANON_KEY } });
+        if(res.ok){
+          const remote = await res.json();
+          if(Array.isArray(remote)){
+            remote.forEach(r=>{
+              if(!combined.find(t=>t.sym===r.symbol)){
+                combined.push({ sym: r.symbol, name: r.name });
+                remoteFlags.add(r.symbol);
+              }
+            });
+          }
+        }
+      }catch(e){ /* local matches only */ }
+    }
+    resultsEl.innerHTML = combined.length ? combined.map(t=>stockSearchResultHTML(t, remoteFlags.has(t.sym))).join("") :
+      `<div class="empty" style="padding:20px 10px;">No matches.</div>`;
+  }
+
+  input.addEventListener("input",(e)=>{
+    clearTimeout(debounceTimer);
+    const val = e.target.value;
+    debounceTimer = setTimeout(()=> runSearch(val), 300);
+  });
+
+  resultsEl.addEventListener("click", async (e)=>{
+    const row = e.target.closest(".suggest-row");
+    if(!row) return;
+    const sym = row.dataset.sym;
+    if(row.dataset.remote === "1" && !TICKERS.find(t=>t.sym===sym)){
+      TICKERS.push({ sym, name: row.dataset.name || sym, price:0, chg:0, hist:[0,0,0,0,0,0,0], sector:null });
+      await fetchSnapshotForSymbol(sym);
+    }
+    overlay.remove();
+    openDetail(sym);
+  });
+
+  setTimeout(()=> input.focus(), 50);
+}
+
+document.getElementById("openStockSearchBtn").addEventListener("click", ()=> openStockSearch());
 
 async function openComments(postId){
   const p = posts.find(p=>p.id===postId);
