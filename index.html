@@ -187,6 +187,10 @@ a{ color:inherit; }
   gap:2px;
   min-width:74px;
 }
+.gainer-card.down{
+  background:var(--bear-soft);
+  border-color:var(--bear);
+}
 .gainer-sym{
   font-family:'IBM Plex Mono',monospace;
   font-weight:600;
@@ -199,6 +203,23 @@ a{ color:inherit; }
   color:var(--bull);
   font-weight:600;
 }
+.gainer-chg.down{ color:var(--bear); }
+.gainers-toggle{
+  display:flex;
+  gap:6px;
+  margin-bottom:7px;
+}
+.gainers-toggle button{
+  background:none;
+  border:none;
+  color:var(--text-faint);
+  font-size:0.68rem;
+  font-weight:600;
+  cursor:pointer;
+  padding:0;
+}
+.gainers-toggle button.active{ color:var(--text); }
+.gainers-toggle .sep{ color:var(--border); font-size:0.68rem; }
 
 /* ---------- Stories bar ---------- */
 .stories-wrap{ padding:12px 18px 2px; }
@@ -302,6 +323,24 @@ a{ color:inherit; }
   border-color:var(--text);
 }
 .chip .dot{ width:6px; height:6px; border-radius:50%; }
+.compose-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:22px;
+  padding:9px 14px;
+  margin-bottom:12px;
+  cursor:pointer;
+  box-shadow:var(--shadow);
+}
+.compose-bar .avatar{ flex:0 0 auto; }
+.compose-bar span{
+  color:var(--text-faint);
+  font-size:0.86rem;
+  flex:1;
+}
 
 /* ---------- Main scroll area ---------- */
 .view{
@@ -836,7 +875,11 @@ label.field-label{
       <div class="tape-track" id="tapeTrack"></div>
     </div>
     <div class="gainers-wrap">
-      <div class="gainers-label">Top gainers today</div>
+      <div class="gainers-toggle" id="gainersToggle">
+        <button class="active" data-mode="gainers">Top gainers today</button>
+        <span class="sep">&middot;</span>
+        <button data-mode="watchlist">My watchlist</button>
+      </div>
       <div class="gainers-row" id="gainersRow"></div>
     </div>
     <div class="stories-wrap">
@@ -1044,19 +1087,40 @@ function renderTape(){
 }
 renderTape();
 
-/* ================= Top gainers strip ================= */
+/* ================= Top gainers / watchlist strip ================= */
+let gainersMode = "gainers";
 function renderGainers(){
   const row = document.getElementById("gainersRow");
-  const top = TICKERS.slice().sort((a,b)=>b.chg-a.chg).slice(0,6);
-  row.innerHTML = top.map(t=>`
-    <button class="gainer-card" data-sym="${t.sym}">
+  let list;
+  if(gainersMode === "watchlist"){
+    list = TICKERS.filter(t=>userState.watch.includes(t.sym));
+    if(!list.length){
+      row.innerHTML = `<div class="empty" style="padding:10px 2px; text-align:left;">Star tickers from Trending to see them here.</div>`;
+      return;
+    }
+  }else{
+    list = TICKERS.slice().sort((a,b)=>b.chg-a.chg).slice(0,6);
+  }
+  row.innerHTML = list.map(t=>{
+    const up = t.chg >= 0;
+    return `
+    <button class="gainer-card ${up?'':'down'}" data-sym="${t.sym}">
       <span class="gainer-sym">${t.sym}</span>
-      <span class="gainer-chg">▲ ${t.chg.toFixed(2)}%</span>
-    </button>`).join("");
+      <span class="gainer-chg ${up?'':'down'}">${up?'▲':'▼'} ${Math.abs(t.chg).toFixed(2)}%</span>
+    </button>`;
+  }).join("");
 }
 document.getElementById("gainersRow").addEventListener("click",(e)=>{
   const card = e.target.closest(".gainer-card");
   if(card) openDetail(card.dataset.sym);
+});
+document.getElementById("gainersToggle").addEventListener("click",(e)=>{
+  const btn = e.target.closest("button[data-mode]");
+  if(!btn) return;
+  gainersMode = btn.dataset.mode;
+  document.querySelectorAll("#gainersToggle button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderGainers();
 });
 renderGainers();
 
@@ -1110,7 +1174,6 @@ let feedTab = "foryou";
 let authorFilter = null;
 
 function postCardHTML(p){
-  const agreed = !!userState.agreed[p.id];
   const liked = !!userState.liked[p.id];
   const prof = p.profile || {handle:"@you", verified:false, agreeRate:null, followers:null};
   const isSelf = prof.handle === "@you";
@@ -1138,10 +1201,18 @@ function postCardHTML(p){
     <div class="post-body">${p.text}</div>
     <div class="post-foot">
       <button class="post-action like-btn ${liked?'liked':''}" data-id="${p.id}">${heartIconHTML(liked)}<span>${p.likes}</span></button>
-      <button class="post-action agree-btn ${agreed?'agreed':''}" data-id="${p.id}">${agreeIcon}<span>${p.agrees}</span></button>
       <button class="post-action reply-btn" data-id="${p.id}">${replyIcon}<span>${p.replies}</span></button>
     </div>
   </article>`;
+}
+
+function composeBarHTML(){
+  const handle = currentUser ? currentUser.handle : "@you";
+  return `
+  <button class="compose-bar" id="composeBar">
+    ${avatarHTML(handle, false)}
+    <span>Share your thesis...</span>
+  </button>`;
 }
 
 function renderFeed(){
@@ -1181,10 +1252,17 @@ function renderFeed(){
     let msg = "Try a different filter, or be the first to post.";
     if(authorFilter) msg = "No posts from this trader yet.";
     else if(currentFilter==="watch") msg = "Star a few tickers and their posts will show up in this tab.";
-    el.innerHTML = banner + `<div class="empty"><div class="big">Nothing here yet</div>${msg}</div>`;
+    el.innerHTML = banner + (authorFilter ? "" : composeBarHTML()) + `<div class="empty"><div class="big">Nothing here yet</div>${msg}</div>`;
+    wireComposeBar();
     return;
   }
-  el.innerHTML = banner + list.map(postCardHTML).join("");
+  el.innerHTML = banner + (authorFilter ? "" : composeBarHTML()) + list.map(postCardHTML).join("");
+  wireComposeBar();
+}
+
+function wireComposeBar(){
+  const bar = document.getElementById("composeBar");
+  if(bar) bar.addEventListener("click", ()=> buildComposer());
 }
 
 function toggleFollow(handle){
@@ -1192,21 +1270,6 @@ function toggleFollow(handle){
   if(i>-1) userState.following.splice(i,1);
   else userState.following.push(handle);
   saveState();
-}
-
-async function toggleAgree(id){
-  const p = posts.find(p=>p.id===id);
-  if(!p) return;
-  const already = !!userState.agreed[id];
-  if(already){ delete userState.agreed[id]; p.agrees -= 1; }
-  else{ userState.agreed[id] = true; p.agrees += 1; }
-  saveState();
-  if(p.real && sb && currentUser){
-    try{
-      if(already) await sb.from("post_agrees").delete().eq("post_id", id).eq("user_id", currentUser.id);
-      else await sb.from("post_agrees").insert({ post_id: id, user_id: currentUser.id });
-    }catch(e){ /* best-effort — local count already updated */ }
-  }
 }
 
 function setAuthorFilter(handle){
@@ -1304,14 +1367,6 @@ async function openProfile(handle){
       renderFeed();
       return;
     }
-    const agreeBtn = e.target.closest(".agree-btn");
-    if(agreeBtn){
-      toggleAgree(agreeBtn.dataset.id);
-      overlay.remove();
-      openProfile(handle);
-      renderFeed();
-      return;
-    }
     const replyBtn = e.target.closest(".reply-btn");
     if(replyBtn){ openComments(replyBtn.dataset.id); return; }
     const tickBtn = e.target.closest(".post-ticker");
@@ -1346,12 +1401,6 @@ document.getElementById("view-feed").addEventListener("click", (e)=>{
     if(already){ delete userState.liked[id]; p.likes -= 1; }
     else{ userState.liked[id] = true; p.likes += 1; }
     saveState();
-    renderFeed();
-    return;
-  }
-  const agreeBtn = e.target.closest(".agree-btn");
-  if(agreeBtn){
-    toggleAgree(agreeBtn.dataset.id);
     renderFeed();
     return;
   }
@@ -1514,6 +1563,7 @@ async function refreshSession(){
     if(!handle) handle = await ensureProfile(session.user.id, session.user.email || "trader");
     currentUser = { id: session.user.id, handle: handle };
     syncWatchlistFromServer();
+    renderFeed();
   }
   updateAuthUI();
 }
@@ -1906,8 +1956,6 @@ async function openComments(postId){
       renderFeed();
       return;
     }
-    const agreeBtn = e.target.closest(".agree-btn");
-    if(agreeBtn){ toggleAgree(agreeBtn.dataset.id); renderFeed(); return; }
     const tickBtn = e.target.closest(".post-ticker");
     if(tickBtn){ overlay.remove(); openDetail(tickBtn.dataset.sym); }
   });
@@ -2074,14 +2122,6 @@ function openDetail(sym){
     }
     const authorLink = e.target.closest(".post-author-link");
     if(authorLink){ overlay.remove(); openProfile(authorLink.dataset.handle); return; }
-    const agreeBtn = e.target.closest(".agree-btn");
-    if(agreeBtn){
-      toggleAgree(agreeBtn.dataset.id);
-      overlay.remove();
-      openDetail(sym);
-      renderFeed();
-      return;
-    }
     const replyBtn = e.target.closest(".reply-btn");
     if(replyBtn){ openComments(replyBtn.dataset.id); }
   });
