@@ -1556,14 +1556,36 @@ async function openProfile(handle){
       </div>
       <div class="profile-joined">${headJoined ? `Trading since ${headJoined}` : ''}</div>
       <div class="profile-bio ${headBio ? '' : 'empty-bio'}">${headBio || 'No bio yet.'}</div>
-      ${isSelf ? '' : `<button class="follow-btn ${followingThem?'on':''}" id="profileFollowBtn" style="width:100%; justify-content:center; padding:9px 0; margin-bottom:14px;">${followingThem?'Following':'Follow'}</button>`}
+      ${isSelf
+        ? `<button class="follow-btn" id="profileEditBtn" style="width:100%; justify-content:center; padding:9px 0; margin-bottom:14px; color:var(--gold); border-color:var(--gold); background:var(--gold-soft);">Edit profile</button>`
+        : `<button class="follow-btn ${followingThem?'on':''}" id="profileFollowBtn" style="width:100%; justify-content:center; padding:9px 0; margin-bottom:14px;">${followingThem?'Following':'Follow'}</button>`}
       <label class="field-label" style="margin-top:0;">Posts</label>
       <div id="profilePosts">${authoredPosts.length ? authoredPosts.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet.</div>'}</div>
+      ${isSelf ? `<button class="follow-btn" id="profileLogoutBtn" style="width:100%; justify-content:center; padding:9px 0; margin-top:18px; color:var(--bear); border-color:var(--bear);">Log out</button>` : ''}
     </div>`;
   document.body.appendChild(overlay);
 
   overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
   document.getElementById("closeProfile").addEventListener("click", ()=> overlay.remove());
+
+  const editBtn = document.getElementById("profileEditBtn");
+  if(editBtn){
+    editBtn.addEventListener("click", ()=>{
+      overlay.remove();
+      buildAccountSheet();
+    });
+  }
+
+  const logoutBtn = document.getElementById("profileLogoutBtn");
+  if(logoutBtn){
+    logoutBtn.addEventListener("click", async ()=>{
+      if(sb) await sb.auth.signOut();
+      currentUser = null;
+      updateAuthUI();
+      overlay.remove();
+      renderFeed();
+    });
+  }
 
   const followBtn = document.getElementById("profileFollowBtn");
   if(followBtn){
@@ -1943,7 +1965,7 @@ async function buildAccountSheet(){
     <div class="sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-head">
-        <div class="sheet-title">${currentUser.handle}</div>
+        <div class="sheet-title">Edit profile</div>
         <button class="sheet-close" id="closeAccount">&times;</button>
       </div>
       <div class="avatar-pick-preview">
@@ -1959,29 +1981,14 @@ async function buildAccountSheet(){
         <input type="text" class="avatar-icon-search" id="avatarIconSearch" placeholder="Search icons — bull, rocket, moon...">
         <div class="avatar-icon-grid" id="avatarIconGrid"></div>
       </div>
-      <div class="detail-stats" id="accountStats">
-        <div class="dstat"><div class="n">&mdash;</div><div class="l">posts</div></div>
-      </div>
       <label class="field-label" style="margin-top:6px;">Bio</label>
       <textarea class="composer-text" id="bioText" maxlength="120" style="min-height:60px;" placeholder="Add a one-line bio — trading style, focus, whatever you want people to know."></textarea>
       <div class="charcount"><span id="bioCharN">0</span>/120</div>
       <button class="post-submit" id="saveBio" style="margin-top:10px;">Save bio</button>
-      <button class="post-submit" id="viewMyPosts" style="margin-top:16px;">View my profile</button>
-      <button class="follow-btn" id="doLogout" style="width:100%; justify-content:center; padding:9px 0; margin-top:10px; color:var(--bear); border-color:var(--bear);">Log out</button>
     </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
   document.getElementById("closeAccount").addEventListener("click", ()=> overlay.remove());
-  document.getElementById("viewMyPosts").addEventListener("click", ()=>{
-    overlay.remove();
-    openProfile(currentUser.handle);
-  });
-  document.getElementById("doLogout").addEventListener("click", async ()=>{
-    if(sb) await sb.auth.signOut();
-    currentUser = null;
-    updateAuthUI();
-    overlay.remove();
-  });
 
   /* ---- avatar picker ---- */
   const avatarPanel = document.getElementById("avatarPanel");
@@ -2048,12 +2055,7 @@ async function buildAccountSheet(){
   // load post count + existing bio
   if(sb){
     try{
-      const [{ count }, { data: profileRow }] = await Promise.all([
-        sb.from("posts").select("id", { count: "exact", head: true }).eq("user_id", currentUser.id),
-        sb.from("profiles").select("bio").eq("id", currentUser.id).maybeSingle()
-      ]);
-      document.getElementById("accountStats").innerHTML =
-        `<div class="dstat"><div class="n">${count != null ? count : 0}</div><div class="l">posts</div></div>`;
+      const { data: profileRow } = await sb.from("profiles").select("bio").eq("id", currentUser.id).maybeSingle();
       if(profileRow && profileRow.bio){
         bioTextarea.value = profileRow.bio;
         bioCharN.textContent = profileRow.bio.length;
@@ -2080,7 +2082,7 @@ async function buildAccountSheet(){
 
 document.getElementById("authBtn").addEventListener("click", async ()=>{
   if(currentUser){
-    buildAccountSheet();
+    openProfile(currentUser.handle);
     return;
   }
   buildAuthSheet();
