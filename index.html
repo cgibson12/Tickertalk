@@ -754,6 +754,49 @@ label.field-label{
 }
 .comment-send:disabled{ opacity:0.4; cursor:not-allowed; }
 
+/* ---------- Profile sheet ---------- */
+.profile-head{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  margin-bottom:12px;
+}
+.profile-avatar{
+  width:64px; height:64px;
+  border-radius:50%;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:1.15rem;
+  font-weight:700;
+  color:#fff;
+}
+.profile-name-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:4px;
+}
+.profile-handle{
+  font-family:'Newsreader',serif;
+  font-weight:600;
+  font-size:1.2rem;
+}
+.profile-bio{
+  font-size:0.86rem;
+  color:var(--text-dim);
+  line-height:1.4;
+  margin-bottom:12px;
+}
+.profile-stats{
+  display:flex;
+  gap:22px;
+  margin-bottom:14px;
+}
+.profile-stats .dstat{ cursor:default; }
+
 /* scrollbar tidy */
 ::-webkit-scrollbar{ width:0; height:0; }
 </style>
@@ -1158,6 +1201,96 @@ function setAuthorFilter(handle){
 }
 function clearAuthorFilter(){ authorFilter = null; renderFeed(); }
 
+/* ================= Profile sheet ================= */
+async function openProfile(handle){
+  const mock = PROFILES.find(p=>p.handle===handle);
+  const isSelf = currentUser && currentUser.handle === handle;
+  const authoredPosts = posts.filter(p=>p.profile && p.profile.handle===handle).sort((a,b)=>b.time-a.time);
+  const verified = mock ? mock.verified : (authoredPosts[0] && authoredPosts[0].profile && authoredPosts[0].profile.verified);
+  const followingThem = userState.following.includes(handle);
+
+  const overlay = document.createElement("div");
+  overlay.className = "sheet-overlay";
+  overlay.id = "profileOverlay";
+  overlay.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div></div>
+        <button class="sheet-close" id="closeProfile">&times;</button>
+      </div>
+      <div class="profile-head">
+        ${avatarHTML(handle, true).replace('avatar-lg', 'avatar-lg profile-avatar')}
+        <div style="flex:1; min-width:0;">
+          <div class="profile-name-row">
+            <span class="profile-handle">${handle}</span>
+            ${verified ? verifiedIcon : ""}
+          </div>
+          <div class="profile-stats" id="profileStats">
+            <div class="dstat"><div class="n">${authoredPosts.length}</div><div class="l">posts</div></div>
+            <div class="dstat"><div class="n">${mock ? fmtCount(mock.followers) : '&mdash;'}</div><div class="l">followers</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="profile-bio" id="profileBio">${isSelf ? '' : ''}</div>
+      ${isSelf ? '' : `<button class="follow-btn ${followingThem?'on':''}" id="profileFollowBtn" style="width:100%; justify-content:center; padding:9px 0; margin-bottom:14px;">${followingThem?'Following':'Follow'}</button>`}
+      <label class="field-label" style="margin-top:0;">Posts</label>
+      <div id="profilePosts">${authoredPosts.length ? authoredPosts.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet.</div>'}</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
+  document.getElementById("closeProfile").addEventListener("click", ()=> overlay.remove());
+
+  const followBtn = document.getElementById("profileFollowBtn");
+  if(followBtn){
+    followBtn.addEventListener("click", ()=>{
+      toggleFollow(handle);
+      overlay.remove();
+      openProfile(handle);
+      renderFeed();
+    });
+  }
+
+  // load real bio if this is a real (non-mock) account
+  if(sb && !mock){
+    try{
+      const { data } = await sb.from("profiles").select("bio").eq("handle", handle).maybeSingle();
+      if(data && data.bio){
+        document.getElementById("profileBio").textContent = data.bio;
+      }
+    }catch(e){ /* leave blank */ }
+  }
+
+  document.getElementById("profilePosts").addEventListener("click",(e)=>{
+    const likeBtn = e.target.closest(".like-btn");
+    if(likeBtn){
+      const id = likeBtn.dataset.id;
+      const p = posts.find(p=>p.id===id);
+      const already = !!userState.liked[id];
+      if(already){ delete userState.liked[id]; p.likes -= 1; }
+      else{ userState.liked[id] = true; p.likes += 1; }
+      saveState();
+      overlay.remove();
+      openProfile(handle);
+      renderFeed();
+      return;
+    }
+    const agreeBtn = e.target.closest(".agree-btn");
+    if(agreeBtn){
+      toggleAgree(agreeBtn.dataset.id);
+      overlay.remove();
+      openProfile(handle);
+      renderFeed();
+      return;
+    }
+    const replyBtn = e.target.closest(".reply-btn");
+    if(replyBtn){ openComments(replyBtn.dataset.id); return; }
+    const tickBtn = e.target.closest(".post-ticker");
+    if(tickBtn){ overlay.remove(); openDetail(tickBtn.dataset.sym); }
+  });
+}
+
 /* ================= Stories bar ================= */
 function renderStories(){
   const row = document.getElementById("storiesRow");
@@ -1170,7 +1303,7 @@ function renderStories(){
 }
 document.getElementById("storiesRow").addEventListener("click",(e)=>{
   const item = e.target.closest(".story-item");
-  if(item) setAuthorFilter(item.dataset.handle);
+  if(item) openProfile(item.dataset.handle);
 });
 renderStories();
 
@@ -1199,7 +1332,7 @@ document.getElementById("view-feed").addEventListener("click", (e)=>{
   const followBtn = e.target.closest(".follow-btn");
   if(followBtn){ toggleFollow(followBtn.dataset.handle); renderFeed(); return; }
   const authorLink = e.target.closest(".post-author-link");
-  if(authorLink){ setAuthorFilter(authorLink.dataset.handle); return; }
+  if(authorLink){ openProfile(authorLink.dataset.handle); return; }
   const tickBtn = e.target.closest(".post-ticker");
   if(tickBtn){ openDetail(tickBtn.dataset.sym); }
 });
@@ -1485,15 +1618,15 @@ async function buildAccountSheet(){
       <textarea class="composer-text" id="bioText" maxlength="120" style="min-height:60px;" placeholder="Add a one-line bio — trading style, focus, whatever you want people to know."></textarea>
       <div class="charcount"><span id="bioCharN">0</span>/120</div>
       <button class="post-submit" id="saveBio" style="margin-top:10px;">Save bio</button>
-      <button class="post-submit" id="viewMyPosts" style="margin-top:16px;">View my posts</button>
+      <button class="post-submit" id="viewMyPosts" style="margin-top:16px;">View my profile</button>
       <button class="follow-btn" id="doLogout" style="width:100%; justify-content:center; padding:9px 0; margin-top:10px; color:var(--bear); border-color:var(--bear);">Log out</button>
     </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
   document.getElementById("closeAccount").addEventListener("click", ()=> overlay.remove());
   document.getElementById("viewMyPosts").addEventListener("click", ()=>{
-    setAuthorFilter(currentUser.handle);
     overlay.remove();
+    openProfile(currentUser.handle);
   });
   document.getElementById("doLogout").addEventListener("click", async ()=>{
     if(sb) await sb.auth.signOut();
@@ -1912,7 +2045,7 @@ function openDetail(sym){
       return;
     }
     const authorLink = e.target.closest(".post-author-link");
-    if(authorLink){ overlay.remove(); setAuthorFilter(authorLink.dataset.handle); return; }
+    if(authorLink){ overlay.remove(); openProfile(authorLink.dataset.handle); return; }
     const agreeBtn = e.target.closest(".agree-btn");
     if(agreeBtn){
       toggleAgree(agreeBtn.dataset.id);
