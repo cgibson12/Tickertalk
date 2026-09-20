@@ -770,6 +770,23 @@ label.field-label{
 .big-chart-wrap svg{ width:100%; height:100%; }
 .big-chart-loading{ font-size:0.78rem; color:var(--text-faint); }
 .range-chips{ padding:0; justify-content:center; margin-bottom:14px; }
+.chart-price-label{
+  position:absolute;
+  right:0;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:0.66rem;
+  color:var(--text-faint);
+}
+.chart-high{ top:0; }
+.chart-low{ bottom:14px; }
+.chart-date-label{
+  position:absolute;
+  bottom:0;
+  font-size:0.66rem;
+  color:var(--text-faint);
+}
+.chart-date-start{ left:0; }
+.chart-date-end{ right:0; }
 
 /* ---------- Comments ---------- */
 .comment{
@@ -2554,7 +2571,15 @@ function openDetail(sym){
 
   let currentRange = "1W";
 
-  function renderBigChart(bars){
+  function fmtChartDate(iso, range){
+    if(!iso) return "";
+    const d = new Date(iso);
+    if(range === "24H") return d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+    if(range === "1W") return d.toLocaleDateString(undefined, { weekday:'short' });
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  }
+
+  function renderBigChart(bars, range){
     const wrap = document.getElementById("bigChartWrap");
     if(!wrap) return; // sheet may have closed
     if(!bars || bars.length < 2){
@@ -2563,14 +2588,25 @@ function openDetail(sym){
     }
     const closes = bars.map(b=>b.c);
     const min = Math.min(...closes), max = Math.max(...closes);
-    const range = (max - min) || 1;
+    const range_ = (max - min) || 1;
     const w = 600, h = 130;
     const step = w / (closes.length - 1);
-    const pts = closes.map((c,i)=> `${(i*step).toFixed(1)},${(h - ((c-min)/range)*h).toFixed(1)}`).join(" ");
+    const pts = closes.map((c,i)=> `${(i*step).toFixed(1)},${(h - ((c-min)/range_)*h).toFixed(1)}`).join(" ");
     const up = closes[closes.length-1] >= closes[0];
-    wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      <polyline points="${pts}" fill="none" stroke="var(${up?'--bull':'--bear'})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`;
+    const startLabel = fmtChartDate(bars[0].t, range);
+    const endLabel = fmtChartDate(bars[bars.length-1].t, range);
+    wrap.innerHTML = `
+      <div class="chart-price-label chart-high">$${max.toFixed(2)}</div>
+      <div class="chart-price-label chart-low">$${min.toFixed(2)}</div>
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <polyline points="${pts}" fill="none" stroke="var(${up?'--bull':'--bear'})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="chart-date-label chart-date-start">${startLabel}</div>
+      <div class="chart-date-label chart-date-end">${endLabel}</div>`;
+  }
+
+  function fallbackBars(){
+    return t.hist.map(c=>({ t: null, c }));
   }
 
   async function loadRange(range){
@@ -2578,7 +2614,7 @@ function openDetail(sym){
     const wrap = document.getElementById("bigChartWrap");
     if(wrap) wrap.innerHTML = `<span class="big-chart-loading">Loading chart...</span>`;
     if(!sb){
-      renderBigChart(t.hist.map((c,i)=>({ t:i, c })));
+      renderBigChart(fallbackBars(), range);
       return;
     }
     try{
@@ -2587,12 +2623,12 @@ function openDetail(sym){
       });
       if(res.ok){
         const data = await res.json();
-        if(currentRange === range) renderBigChart(data.bars);
+        if(currentRange === range) renderBigChart(data.bars, range);
       }else{
-        if(currentRange === range) renderBigChart(t.hist.map((c,i)=>({ t:i, c })));
+        if(currentRange === range) renderBigChart(fallbackBars(), range);
       }
     }catch(e){
-      if(currentRange === range) renderBigChart(t.hist.map((c,i)=>({ t:i, c })));
+      if(currentRange === range) renderBigChart(fallbackBars(), range);
     }
   }
   loadRange("1W");
