@@ -759,6 +759,17 @@ label.field-label{
 }
 .dstat .n{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:1rem; }
 .dstat .l{ font-size:0.7rem; color:var(--text-faint); }
+.big-chart-wrap{
+  position:relative;
+  margin:4px 0 10px;
+  height:130px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.big-chart-wrap svg{ width:100%; height:100%; }
+.big-chart-loading{ font-size:0.78rem; color:var(--text-faint); }
+.range-chips{ padding:0; justify-content:center; margin-bottom:14px; }
 
 /* ---------- Comments ---------- */
 .comment{
@@ -1120,6 +1131,7 @@ const SUPABASE_URL = "https://anaogolzoedjovlbdkfe.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_QTh5rmcO9SDZBqADLwFV-w_2oVy0NCT";
 const MARKET_DATA_URL = SUPABASE_URL + "/functions/v1/Market-data";
 const SYMBOL_SEARCH_URL = SUPABASE_URL + "/functions/v1/Symbol-search";
+const TICKER_BARS_URL = SUPABASE_URL + "/functions/v1/Ticker-bars";
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let currentUser = null; // { id, handle } once signed in
 
@@ -2511,6 +2523,14 @@ function openDetail(sym){
         <button class="sheet-close" id="closeDetail">&times;</button>
       </div>
       <div class="detail-sub">${t.name} &middot; $${t.price.toFixed(2)}</div>
+      <div class="big-chart-wrap" id="bigChartWrap"><span class="big-chart-loading">Loading chart...</span></div>
+      <div class="chiprow range-chips" id="rangeChips">
+        <button class="chip" data-range="24H">24H</button>
+        <button class="chip active" data-range="1W">1W</button>
+        <button class="chip" data-range="1M">1M</button>
+        <button class="chip" data-range="3M">3M</button>
+        <button class="chip" data-range="1Y">1Y</button>
+      </div>
       <div class="detail-stats">
         <div class="dstat"><div class="n">${related.length}</div><div class="l">posts</div></div>
         <div class="dstat"><div class="n" style="color:var(--bull)">${bullPct}%</div><div class="l">bullish</div></div>
@@ -2531,6 +2551,59 @@ function openDetail(sym){
       <div id="detailPosts" style="margin-top:14px;">${related.length ? related.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet on '+sym+'.</div>'}</div>
     </div>`;
   document.body.appendChild(overlay);
+
+  let currentRange = "1W";
+
+  function renderBigChart(bars){
+    const wrap = document.getElementById("bigChartWrap");
+    if(!wrap) return; // sheet may have closed
+    if(!bars || bars.length < 2){
+      wrap.innerHTML = `<span class="big-chart-loading">No chart data for this range.</span>`;
+      return;
+    }
+    const closes = bars.map(b=>b.c);
+    const min = Math.min(...closes), max = Math.max(...closes);
+    const range = (max - min) || 1;
+    const w = 600, h = 130;
+    const step = w / (closes.length - 1);
+    const pts = closes.map((c,i)=> `${(i*step).toFixed(1)},${(h - ((c-min)/range)*h).toFixed(1)}`).join(" ");
+    const up = closes[closes.length-1] >= closes[0];
+    wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline points="${pts}" fill="none" stroke="var(${up?'--bull':'--bear'})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  async function loadRange(range){
+    currentRange = range;
+    const wrap = document.getElementById("bigChartWrap");
+    if(wrap) wrap.innerHTML = `<span class="big-chart-loading">Loading chart...</span>`;
+    if(!sb){
+      renderBigChart(t.hist.map((c,i)=>({ t:i, c })));
+      return;
+    }
+    try{
+      const res = await fetch(`${TICKER_BARS_URL}?symbol=${sym}&range=${range}`, {
+        headers: { Authorization: "Bearer " + SUPABASE_ANON_KEY }
+      });
+      if(res.ok){
+        const data = await res.json();
+        if(currentRange === range) renderBigChart(data.bars);
+      }else{
+        if(currentRange === range) renderBigChart(t.hist.map((c,i)=>({ t:i, c })));
+      }
+    }catch(e){
+      if(currentRange === range) renderBigChart(t.hist.map((c,i)=>({ t:i, c })));
+    }
+  }
+  loadRange("1W");
+
+  document.getElementById("rangeChips").addEventListener("click",(e)=>{
+    const chip = e.target.closest(".chip");
+    if(!chip) return;
+    document.querySelectorAll("#rangeChips .chip").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active");
+    loadRange(chip.dataset.range);
+  });
 
   document.getElementById("detailSortChips").addEventListener("click",(e)=>{
     const chip = e.target.closest(".chip");
