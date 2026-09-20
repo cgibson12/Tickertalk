@@ -755,11 +755,18 @@ label.field-label{
 .comment-send:disabled{ opacity:0.4; cursor:not-allowed; }
 
 /* ---------- Profile sheet ---------- */
+.profile-cover{
+  height:64px;
+  margin:-16px -18px 0;
+  border-radius:20px 20px 0 0;
+}
 .profile-head{
   display:flex;
   align-items:flex-start;
   gap:14px;
+  margin-top:-30px;
   margin-bottom:12px;
+  padding:0 2px;
 }
 .profile-avatar{
   width:64px; height:64px;
@@ -772,23 +779,34 @@ label.field-label{
   font-size:1.15rem;
   font-weight:700;
   color:#fff;
+  box-shadow:0 0 0 3px var(--surface);
 }
 .profile-name-row{
   display:flex;
   align-items:center;
   gap:6px;
   margin-bottom:4px;
+  margin-top:6px;
 }
 .profile-handle{
   font-family:'Newsreader',serif;
   font-weight:600;
   font-size:1.2rem;
 }
+.profile-joined{
+  font-size:0.7rem;
+  color:var(--text-faint);
+  margin-bottom:8px;
+}
 .profile-bio{
   font-size:0.86rem;
   color:var(--text-dim);
   line-height:1.4;
   margin-bottom:12px;
+}
+.profile-bio.empty-bio{
+  color:var(--text-faint);
+  font-style:italic;
 }
 .profile-stats{
   display:flex;
@@ -1208,6 +1226,7 @@ async function openProfile(handle){
   const authoredPosts = posts.filter(p=>p.profile && p.profile.handle===handle).sort((a,b)=>b.time-a.time);
   const verified = mock ? mock.verified : (authoredPosts[0] && authoredPosts[0].profile && authoredPosts[0].profile.verified);
   const followingThem = userState.following.includes(handle);
+  const accentColor = AVATAR_PALETTE[hashStr(handle) % AVATAR_PALETTE.length];
 
   const overlay = document.createElement("div");
   overlay.className = "sheet-overlay";
@@ -1215,13 +1234,14 @@ async function openProfile(handle){
   overlay.innerHTML = `
     <div class="sheet">
       <div class="sheet-handle"></div>
-      <div class="sheet-head">
+      <div class="profile-cover" style="background:linear-gradient(135deg, ${accentColor}55, ${accentColor}15);"></div>
+      <div class="sheet-head" style="margin-bottom:0;">
         <div></div>
         <button class="sheet-close" id="closeProfile">&times;</button>
       </div>
       <div class="profile-head">
         ${avatarHTML(handle, true).replace('avatar-lg', 'avatar-lg profile-avatar')}
-        <div style="flex:1; min-width:0;">
+        <div style="flex:1; min-width:0; padding-top:6px;">
           <div class="profile-name-row">
             <span class="profile-handle">${handle}</span>
             ${verified ? verifiedIcon : ""}
@@ -1232,7 +1252,8 @@ async function openProfile(handle){
           </div>
         </div>
       </div>
-      <div class="profile-bio" id="profileBio">${isSelf ? '' : ''}</div>
+      <div class="profile-joined" id="profileJoined"></div>
+      <div class="profile-bio empty-bio" id="profileBio">No bio yet.</div>
       ${isSelf ? '' : `<button class="follow-btn ${followingThem?'on':''}" id="profileFollowBtn" style="width:100%; justify-content:center; padding:9px 0; margin-bottom:14px;">${followingThem?'Following':'Follow'}</button>`}
       <label class="field-label" style="margin-top:0;">Posts</label>
       <div id="profilePosts">${authoredPosts.length ? authoredPosts.map(postCardHTML).join("") : '<div class="empty" style="padding:30px 10px;">No posts yet.</div>'}</div>
@@ -1252,14 +1273,21 @@ async function openProfile(handle){
     });
   }
 
-  // load real bio if this is a real (non-mock) account
+  // load real bio + joined date if this is a real (non-mock) account
   if(sb && !mock){
     try{
-      const { data } = await sb.from("profiles").select("bio").eq("handle", handle).maybeSingle();
+      const { data } = await sb.from("profiles").select("bio, created_at").eq("handle", handle).maybeSingle();
+      const bioEl = document.getElementById("profileBio");
       if(data && data.bio){
-        document.getElementById("profileBio").textContent = data.bio;
+        bioEl.textContent = data.bio;
+        bioEl.classList.remove("empty-bio");
       }
-    }catch(e){ /* leave blank */ }
+      if(data && data.created_at){
+        const d = new Date(data.created_at);
+        const joined = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        document.getElementById("profileJoined").textContent = `Trading since ${joined}`;
+      }
+    }catch(e){ /* leave defaults */ }
   }
 
   document.getElementById("profilePosts").addEventListener("click",(e)=>{
