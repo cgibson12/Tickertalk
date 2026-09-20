@@ -1221,9 +1221,7 @@ document.getElementById("gainersRow").addEventListener("click",(e)=>{
   const card = e.target.closest(".gainer-card");
   if(!card) return;
   if(card.dataset.sector){
-    const sectors = computeSectors();
-    const sec = sectors.find(s=>s.name===card.dataset.sector);
-    if(sec && sec.tickers[0]) openDetail(sec.tickers[0].sym);
+    openSector(card.dataset.sector);
     return;
   }
   if(card.dataset.sym) openDetail(card.dataset.sym);
@@ -1611,6 +1609,40 @@ function tickCardHTML(t){
       <button class="watch-btn ${watched?'on':''}" data-sym="${t.sym}">${starIcon}${watched?'Watching':'Watch'}</button>
     </div>
   </div>`;
+}
+
+function openSector(sectorName){
+  const sectors = computeSectors();
+  const sec = sectors.find(s=>s.name===sectorName);
+  if(!sec) return;
+  const up = sec.avg >= 0;
+
+  const overlay = document.createElement("div");
+  overlay.className = "sheet-overlay";
+  overlay.id = "sectorOverlay";
+  overlay.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="detail-head">
+          <span class="detail-sym">${sec.name}</span>
+          <span class="chg ${up?'up':'down'}" style="font-size:0.9rem;">${up?'▲':'▼'} ${Math.abs(sec.avg).toFixed(2)}% avg</span>
+        </div>
+        <button class="sheet-close" id="closeSector">&times;</button>
+      </div>
+      <div class="detail-sub">${sec.tickers.length} ${sec.tickers.length===1?'ticker':'tickers'} in this sector</div>
+      <div id="sectorTickers">${sec.tickers.map(tickCardHTML).join("")}</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click",(e)=>{ if(e.target === overlay) overlay.remove(); });
+  document.getElementById("closeSector").addEventListener("click", ()=> overlay.remove());
+  document.getElementById("sectorTickers").addEventListener("click",(e)=>{
+    const watchBtn = e.target.closest(".watch-btn");
+    if(watchBtn){ toggleWatch(watchBtn.dataset.sym); overlay.remove(); openSector(sectorName); return; }
+    const tickBtn = e.target.closest(".post-ticker");
+    if(tickBtn){ overlay.remove(); openDetail(tickBtn.dataset.sym); }
+  });
 }
 
 function renderTrending(){
